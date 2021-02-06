@@ -1,0 +1,89 @@
+import asyncio
+from typing import AsyncGenerator
+
+from .base import Base
+
+
+class Delay(Base):
+    def __init__(self, source: AsyncGenerator, *, timeout: int):
+        self._timeout = timeout
+        self._source = source
+
+    async def get_data(self):
+        await asyncio.sleep(self._timeout)
+        data = await self._source.__anext__()
+        return data
+
+
+class MergeStreams(Base):
+    def __init__(self, *generators: AsyncGenerator):
+        self._gens = generators
+        self._index = 0
+
+    async def get_data(self):
+        data = await self._gens[self._index].__anext__()
+        self._index = (self._index + 1) % len(self._gens)
+        return data
+
+
+class RaceToMergeStreams(Base):
+    def __init__(self, *generators: AsyncGenerator):
+        self._gens = generators
+        self._data = {}
+        self._pending = {}
+
+    async def get_data(self):
+        if len(self._data) == 0:
+            if len(self._pending) == 0:
+                self._pending = {i.__anext__() for i in self._gens}
+            self._data, self._pending = await asyncio.wait(
+                self._pending, return_when=asyncio.FIRST_COMPLETED
+            )
+        return self._data.pop().result()
+
+
+class GatherAll(Base):
+    def __init__(self, *generators: AsyncGenerator):
+        self._gens = generators
+
+    async def get_data(self):
+        return asyncio.gather([i for i in self._gens])
+
+
+class Race(Base):
+    """
+    Allows you to return data from one of the generators.
+    """
+
+    def __init__(self, *generators: AsyncGenerator):
+        self._gens = generators
+
+    async def get_data(self):
+        done, pending = await asyncio.wait(
+            {i.__anext__() for i in self._gens}, return_when=asyncio.FIRST_COMPLETED
+        )
+        for i in pending:
+            i.cancel()
+        return [i.result() for i in done]
+
+
+class Batch(Base):
+    def __init__(self, source: AsyncGenerator, *, batch_size: int):
+        self._source = source
+        self._batch_size = batch_size
+
+    async def get_data(self):
+        return [await self._source.__anext__() for i in range(self._batch_size)]
+
+
+class Limit(Base):
+    def __init__(self, source: AsyncGenerator, *, limit: int):
+        self._source = source
+        self._limit = limit
+        self._count = 0
+
+    async def get_data(self):
+        if self._count == self._limit:
+            raise StopAsyncIteration()
+        self._count += 1
+        return await self._source.__anext__()
