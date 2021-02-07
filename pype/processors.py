@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator
 
-from .base import Base
+from .base import Base, SyncBase
 
 
 class Delay(Base):
@@ -84,6 +84,18 @@ class Limit(Base):
 
     async def get_data(self):
         if self._count == self._limit:
-            raise StopAsyncIteration()
+            raise StopAsyncIteration(f"Reached set limit of {self._limit} iterations")
         self._count += 1
         return await self._source.__anext__()
+
+
+class AsyncToSync(SyncBase):
+    def __init__(self, source: AsyncGenerator):
+        self._source = source
+        self._loop = asyncio.new_event_loop()
+
+    def get_data(self):
+        try:
+            return self._loop.run_until_complete(self._source.__anext__())
+        except StopAsyncIteration as async_iteration_stopped:
+            raise StopIteration from async_iteration_stopped
