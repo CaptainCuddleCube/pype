@@ -1,3 +1,6 @@
+from functools import partial
+
+
 class Base:
     async def get_data(self):
         raise NotImplementedError("Please fill this out")
@@ -11,12 +14,13 @@ class Base:
     def __or__(self, other):
         return other(self)
 
-    def pype(self, other, *args, **kwargs):
-        return other(self, *args, **kwargs)
+    @classmethod
+    def apply(cls, *args, **kwargs):
+        return partial(cls, *args, **kwargs)
 
 
 class SyncBase:
-    async def get_data(self):
+    def get_data(self):
         raise NotImplementedError("Please fill this out")
 
     def __next__(self):
@@ -28,5 +32,6 @@ class SyncBase:
     def __or__(self, other):
         return other(self)
 
-    def pype(self, other, *args, **kwargs):
-        return other(self, *args, **kwargs)
+    @classmethod
+    def apply(cls, *args, **kwargs):
+        return partial(cls, *args, **kwargs)

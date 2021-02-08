@@ -1,18 +1,17 @@
 import sys
 
-from .base import Base
 
-
-class StdOut(Base):
+class StdOut:
     def __init__(self, source):
         self._source = source
+        self._file = sys.stdout
 
-    async def get_data(self):
-        data = await self._source.__anext__()
-        print(data, file=sys.stdout)
+    async def run(self):
+        async for data in self._source:
+            print(data, file=self._file)
 
 
 class StdErr(StdOut):
-    async def get_data(self):
-        data = await self._source.__anext__()
-        print(data, file=sys.stderr)
+    def __init__(self, source):
+        super().__init__(source)
+        self._file = sys.stderr

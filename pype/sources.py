@@ -5,7 +5,7 @@ from typing import Any
 from .base import Base
 
 
-class HttpSource(Base):
+class Http(Base):
     def __init__(self, url: str, headers: dict = None, parameters: dict = None):
         self._url = url
         self._headers = headers
@@ -19,7 +19,7 @@ class HttpSource(Base):
         return str(resp.content)
 
 
-class ConstantSource(Base):
+class Constant(Base):
     def __init__(self, constant: Any):
         self._constant = constant
 
