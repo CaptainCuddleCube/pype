@@ -15,7 +15,7 @@ class Base:
         return other(self)
 
     @classmethod
-    def apply(cls, *args, **kwargs):
+    def with_args(cls, *args, **kwargs):
         return partial(cls, *args, **kwargs)
 
 
@@ -33,5 +33,5 @@ class SyncBase:
         return other(self)
 
     @classmethod
-    def apply(cls, *args, **kwargs):
+    def with_args(cls, *args, **kwargs):
         return partial(cls, *args, **kwargs)

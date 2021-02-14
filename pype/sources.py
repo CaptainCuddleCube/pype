@@ -1,7 +1,10 @@
 import asyncio
-import httpx
 import sys
 from typing import Any
+
+import asyncpg
+import httpx
+
 from .base import Base
 
 
@@ -50,3 +53,66 @@ class SubProcess(Base):
         if err != b"" and self._stop_on_error or self._proc.stdout.at_eof():
             raise StopAsyncIteration
         return await self._proc.stdout.readline()
+
+
+class PostgresQuery(Base):
+    """
+    Creates a stream of data from a PostgreSQL database. While records are
+    returned one by one, there is a prefetch argument which allows for the
+    number of rows fetched from the database to be fetched first.
+    """
+
+    def __init__(
+        self,
+        query,
+        user,
+        password,
+        database,
+        host,
+        port=5432,
+        prefetch_size=None,
+    ):
+        self._query = query
+        self._prefetch_size = prefetch_size
+        self._conn_details = dict(
+            user=user, password=password, database=database, host=host, port=port
+        )
+        self._data_gen = None
+
+    async def _query_gen(self):
+        conn = await asyncpg.connect(**self._conn_details)
+        async with conn.transaction():
+            async for record in conn.cursor(self._query, prefetch=self._prefetch_size):
+                yield record
+        await conn.close()
+
+    def reset_stream(self):
+        self._data_gen = None
+
+    async def get_data(self):
+        if self._data_gen is None:
+            self._data_gen = self._query_gen()
+        return await self._data_gen.__anext__()
+
+
+class PostgresBatchQuery(PostgresQuery):
+    def __init__(
+        self,
+        query,
+        user,
+        password,
+        database,
+        host,
+        port=5432,
+        batch_size=None,
+    ):
+        super().__init__(query, user, password, database, host, port)
+        self._batch_size = batch_size
+
+    async def _query_gen(self):
+        conn = await asyncpg.connect(**self._conn_details)
+        async with conn.transaction():
+            cur = await conn.cursor(self._query)
+            while not cur._exhausted:
+                yield cur.fetch(self._batch_size)
+        await conn.close()

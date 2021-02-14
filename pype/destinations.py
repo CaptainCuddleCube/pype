@@ -8,7 +8,7 @@ class StdOut:
 
     async def run(self):
         async for data in self._source:
-            print(data, file=self._file)
+            print(data, file=self._file, end="")
 
 
 class StdErr(StdOut):

@@ -11,8 +11,17 @@ class Delay(Base):
 
     async def get_data(self):
         await asyncio.sleep(self._timeout)
+        return await self._source.__anext__()
+
+
+class AddPrefix(Base):
+    def __init__(self, source: AsyncGenerator, *, prefix: str):
+        self._source = source
+        self._prefix = prefix
+
+    async def get_data(self):
         data = await self._source.__anext__()
-        return data
+        return f"{self._prefix}{data}"
 
 
 class MergeStreams(Base):
