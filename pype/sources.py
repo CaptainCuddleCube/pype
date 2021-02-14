@@ -71,6 +71,7 @@ class PostgresQuery(Base):
         host,
         port=5432,
         prefetch_size=None,
+        data_type=dict,
     ):
         self._query = query
         self._prefetch_size = prefetch_size
@@ -78,12 +79,15 @@ class PostgresQuery(Base):
             user=user, password=password, database=database, host=host, port=port
         )
         self._data_gen = None
+        if data_type != dict or data_type != tuple:
+            raise ValueError("The only data types allowed are dictionaries and tuples.")
+        self._data_type = data_type
 
     async def _query_gen(self):
         conn = await asyncpg.connect(**self._conn_details)
         async with conn.transaction():
             async for record in conn.cursor(self._query, prefetch=self._prefetch_size):
-                yield record
+                yield self._data_type(record)
         await conn.close()
 
     def reset_stream(self):
@@ -104,9 +108,12 @@ class PostgresBatchQuery(PostgresQuery):
         database,
         host,
         port=5432,
+        data_type=dict,
         batch_size=None,
     ):
-        super().__init__(query, user, password, database, host, port)
+        super().__init__(
+            query, user, password, database, host, port, data_type=data_type
+        )
         self._batch_size = batch_size
 
     async def _query_gen(self):
@@ -114,5 +121,6 @@ class PostgresBatchQuery(PostgresQuery):
         async with conn.transaction():
             cur = await conn.cursor(self._query)
             while not cur._exhausted:
-                yield cur.fetch(self._batch_size)
+                tmp_data = await cur.fetch(self._batch_size)
+                yield [self._data_type(i) for i in tmp_data]
         await conn.close()
