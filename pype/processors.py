@@ -35,6 +35,17 @@ class MergeStreams(Base):
         return data
 
 
+class CachedResult(Base):
+    def __init__(self, generator: AsyncGenerator):
+        self._gen = generator
+        self._value = None
+
+    async def get_data(self):
+        if self._value is None:
+            self._value = await self._gen.__anext__()
+        return self._value
+
+
 class RaceToMergeStreams(Base):
     def __init__(self, *generators: AsyncGenerator):
         self._gens = generators
